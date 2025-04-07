@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2dd4bf; /* Teal */
+            --secondary: #f472b6; /* Coral */
+            --accent: #818cf8; /* Indigo */
+            --dark: #1f2937; /* Dark Gray */
+            --light: #f3f4f6; /* Light Gray */
+        }
+        body { font-family: 'Poppins', sans-serif; }
+        .sidebar { transition: width 0.3s ease; background: linear-gradient(135deg, var(--primary), var(--accent)); }
+        .sidebar.collapsed { width: 4rem; }
+        .sidebar.collapsed .sidebar-text { display: none; }
+        .card { transition: transform 0.2s ease, box-shadow 0.2s ease; border: none; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15); }
+        .btn { transition: background 0.3s ease, transform 0.2s ease; }
+        .btn:hover { transform: scale(1.05); }
+        .modal { display: none; transition: opacity 0.3s ease; }
+        .modal.active { display: flex; opacity: 1; }
+        .progress-bar { height: 10px; border-radius: 5px; transition: width 0.5s ease; }
+        .chatbot { border: 2px solid var(--accent); }
+        .notification { animation: slideIn 0.5s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen transition-colors duration-300 dark:bg-gray-900 dark:text-gray-200">
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-75 items-center justify-center active">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl w-full max-w-md shadow-2xl">
+            <h3 class="text-2xl font-bold text-teal-600 dark:text-teal-400 mb-6">Welcome Back</h3>
+            <input id="email" type="email" placeholder="Email" class="w-full border rounded-lg p-3 dark:bg-gray-700 mb-4 focus:ring-2 focus:ring-teal-500">
+            <input id="password" type="password" placeholder="Password" class="w-full border rounded-lg p-3 dark:bg-gray-700 mb-4 focus:ring-2 focus:ring-teal-500">
+            <button onclick="login()" class="btn bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 w-full">Login</button>
+        </div>
+    </div>
+
+    <div id="app" class="flex h-screen hidden">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar w-64 flex-shrink-0 shadow-xl text-white">
+            <div class="p-4 flex justify-between items-center border-b border-white/20">
+                <h2 class="text-2xl font-extrabold sidebar-text">Faculty Hub</h2>
+                <button id="toggleSidebar" class="text-white"><i class="fas fa-bars text-xl"></i></button>
+            </div>
+            <nav id="nav" class="p-4 space-y-3">
+                <a href="#" data-section="dashboard" class="flex items-center p-3 hover:bg-white/10 rounded-lg active">
+                    <i class="fas fa-home mr-3 text-white"></i><span class="sidebar-text">Dashboard</span>
+                </a>
+                <a href="#" data-section="faculty" class="flex items-center p-3 hover:bg-white/10 rounded-lg">
+                    <i class="fas fa-chalkboard-teacher mr-3 text-white"></i><span class="sidebar-text">Faculty</span>
+                </a>
+                <a href="#" data-section="courses" class="flex items-center p-3 hover:bg-white/10 rounded-lg">
+                    <i class="fas fa-book mr-3 text-white"></i><span class="sidebar-text">Courses</span>
+                </a>
+                <a href="#" data-section="availability" class="flex items-center p-3 hover:bg-white/10 rounded-lg">
+                    <i class="fas fa-calendar-check mr-3 text-white"></i><span class="sidebar-text">Availability</span>
+                </a>
+                <a href="#" data-section="workload" class="flex items-center p-3 hover:bg-white/10 rounded-lg">
+                    <i class="fas fa-tasks mr-3 text-white"></i><span class="sidebar-text">Workload</span>
+                </a>
+                <a href="#" data-section="settings" class="flex items-center p-3 hover:bg-white/10 rounded-lg">
+                    <i class="fas fa-cog mr-3 text-white"></i><span class="sidebar-text">Settings</span>
+                </a>
+            </nav>
+            <div class="p-4 mt-auto border-t border-white/20">
+                <button id="themeToggle" class="flex items-center p-3 hover:bg-white/10 rounded-lg w-full">
+                    <i class="fas fa-moon mr-3 text-white"></i><span class="sidebar-text">Toggle Theme</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white dark:bg-gray-800 p-4 shadow-lg flex justify-between items-center">
+                <h1 id="sectionTitle" class="text-3xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
+                <div class="flex items-center space-x-4">
+                    <input id="searchBar" type="text" placeholder="Search..." class="border rounded-lg p-2 dark:bg-gray-700 focus:ring-2 focus:ring-indigo-500">
+                    <span id="userRole" class="text-gray-600 dark:text-gray-300 font-medium"></span>
+                    <button id="logout" class="btn bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Logout</button>
+                </div>
+            </header>
+            <main class="flex-1 p-6 overflow-auto">
+                <div id="dashboard" class="section">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="card bg-white dark:bg-gray-800 p-6 rounded-xl">
+                            <h3 class="text-xl font-semibold text-teal-600 dark:text-teal-400 mb-4"><i class="fas fa-calendar mr-2"></i>Weekly Schedule</h3>
+                            <div id="calendar" class="grid grid-cols-6 gap-2 text-sm"></div>
+                        </div>
+                        <div class="card bg-white dark:bg-gray-800 p-6 rounded-xl">
+                            <h3 class="text-xl font-semibold text-indigo-600 dark:text-indigo-400 mb-4"><i class="fas fa-bolt mr-2"></i>Quick Actions</h3>
+                            <button id="assignCourses" class="btn bg-teal-600 text-white px-4 py-2 rounded-lg mb-3 w-full">Auto Assign</button>
+                            <button id="openAddModal" class="btn bg-indigo-600 text-white px-4 py-2 rounded-lg mb-3 w-full">Add Faculty</button>
+                            <button id="exportPDF" class="btn bg-coral-600 text-white px-4 py-2 rounded-lg w-full">Export PDF</button>
+                        </div>
+                        <div class="card bg-white dark:bg-gray-800 p-6 rounded-xl">
+                            <h3 class="text-xl font-semibold text-coral-600 dark:text-coral-400 mb-4"><i class="fas fa-chart-bar mr-2"></i>Workload Overview</h3>
+                            <canvas id="workloadChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div id="faculty" class="section hidden">
+                    <h3 class="text-2xl font-semibold text-teal-600 dark:text-teal-400 mb-4">Faculty</h3>
+                    <button onclick="openCrudModal('faculty')" class="btn bg-teal-600 text-white px-4 py-2 rounded-lg mb-4">Add Faculty</button>
+                    <div id="facultyList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+                <div id="courses" class="section hidden">
+                    <h3 class="text-2xl font-semibold text-indigo-600 dark:text-indigo-400 mb-4">Courses</h3>
+                    <button onclick="openCrudModal('course')" class="btn bg-indigo-600 text-white px-4 py-2 rounded-lg mb-4">Add Course</button>
+                    <div id="coursesList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+                <div id="availability" class="section hidden">
+                    <h3 class="text-2xl font-semibold text-coral-600 dark:text-coral-400 mb-4">Faculty Availability</h3>
+                    <div id="availabilityGrid" class="grid grid-cols-6 gap-2 text-sm"></div>
+                </div>
+                <div id="workload" class="section hidden">
+                    <h3 class="text-2xl font-semibold text-teal-600 dark:text-teal-400 mb-4">Faculty Workload</h3>
+                    <div id="workloadList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+                </div>
+                <div id="settings" class="section hidden">
+                    <h3 class="text-2xl font-semibold text-indigo-600 dark:text-indigo-400 mb-4">Settings</h3>
+                    <p class="text-gray-600 dark:text-gray-300">Customize your preferences here.</p>
+                </div>
+            </main>
+        </div>
+
+        <!-- Right Widgets -->
+        <div class="w-80 flex-shrink-0 p-6 space-y-6 overflow-auto bg-gray-50 dark:bg-gray-800">
+            <div class="card bg-white dark:bg-gray-900 p-4 rounded-xl">
+                <h3 class="text-lg font-semibold text-teal-600 dark:text-teal-400 mb-3"><i class="fas fa-robot mr-2"></i>AI Suggestions</h3>
+                <ul id="suggestions" class="space-y-2 text-sm text-gray-600 dark:text-gray-300"></ul>
+            </div>
+            <div class="card bg-white dark:bg-gray-900 p-4 rounded-xl">
+                <h3 class="text-lg font-semibold text-indigo-600 dark:text-indigo-400 mb-3"><i class="fas fa-bell mr-2"></i>Notifications</h3>
+                <ul id="notifications" class="space-y-2 text-sm text-gray-600 dark:text-gray-300"></ul>
+            </div>
+            <div class="card bg-white dark:bg-gray-900 p-4 rounded-xl">
+                <h3 class="text-lg font-semibold text-coral-600 dark:text-coral-400 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Conflict Alerts</h3>
+                <ul id="conflicts" class="space-y-2 text-sm text-gray-600 dark:text-gray-300"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Faculty Assignment Modal -->
+    <div id="addModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-75 items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl w-full max-w-md shadow-2xl">
+            <h3 class="text-xl font-semibold text-teal-600 dark:text-teal-400 mb-6">Assign Course</h3>
+            <select id="faculty" class="w-full border rounded-lg p-3 dark:bg-gray-700 mb-4"></select>
+            <select id="course" class="w-full border rounded-lg p-3 dark:bg-gray-700 mb-4"></select>
+            <select id="day" class="w-full border rounded-lg p-3 dark:bg-gray-700 mb-4">
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+            </select>
+            <select id="time" class="w-full border rounded-lg p-3 dark:bg-gray-700 mb-4">
+                <option value="9:00">9:00</option>
+                <option value="10:00">10:00</option>
+                <option value="11:00">11:00</option>
+                <option value="12:00">12:00</option>
+                <option value="1:00">1:00</option>
+            </select>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeAddModal()" class="btn px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Cancel</button>
+                <button onclick="assignCourse()" class="btn bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700">Assign</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRUD Modal -->
+    <div id="crudModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-75 items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl w-full max-w-md shadow-2xl">
+            <h3 id="crudTitle" class="text-xl font-semibold text-indigo-600 dark:text-indigo-400 mb-6"></h3>
+            <input id="crudName" type="text" placeholder="Name" class="w-full border rounded-lg p-3 dark:bg-gray-700 mb-4">
+            <input id="crudExtra" type="text" class="w-full border rounded-lg p-3 dark:bg-gray-700 hidden">
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeCrudModal()" class="btn px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Cancel</button>
+                <button onclick="saveCrud()" class="btn bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chatbot -->
+    <div id="chatbot" class="fixed bottom-4 right-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg w-80">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-semibold text-teal-600 dark:text-teal-400">AI Assistant</h3>
+            <button onclick="toggleChatbot()" class="text-gray-600 dark:text-gray-300"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="chatMessages" class="h-48 overflow-y-auto mb-3 text-sm"></div>
+        <input id="chatInput" type="text" placeholder="Ask me anything..." class="w-full border rounded-lg p-2 dark:bg-gray-700">
+        <button onclick="sendChat()" class="btn mt-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 w-full">Send</button>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        let currentUser = null;
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        const times = ['9:00', '10:00', '11:00', '12:00', '1:00'];
+
+        // Simulated Backend Data
+        let assignments = JSON.parse(localStorage.getItem('assignments')) || [];
+        let faculty = JSON.parse(localStorage.getItem('faculty')) || [];
+        let courses = JSON.parse(localStorage.getItem('courses')) || [];
+        const users = JSON.parse(localStorage.getItem('users')) || [
+            { email: 'admin@example.com', password: 'admin123', role: 'admin' },
+            { email: 'faculty@example.com', password: 'faculty123', role: 'faculty' },
+        ];
+
+        // Authentication
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const user = users.find(u => u.email === email && u.password === password);
+            if (!user) {
+                alert('Invalid credentials');
+                return;
+            }
+            currentUser = user;
+            document.getElementById('loginModal').classList.remove('active');
+            document.getElementById('app').classList.remove('hidden');
+            document.getElementById('userRole').textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+            updateUIForRole();
+            fetchData();
+        }
+
+        document.getElementById('logout').addEventListener('click', () => {
+            currentUser = null;
+            document.getElementById('app').classList.add('hidden');
+            document.getElementById('loginModal').classList.add('active');
+        });
+
+        // Fetch Data (Simulated)
+        function fetchData() {
+            if (!faculty.length) faculty = [
+                { _id: '1', name: 'Dr. Smith', expertise: 'CS', bio: 'Expert in AI' },
+                { _id: '2', name: 'Dr. Jones', expertise: 'Math', bio: 'Loves Calculus' }
+            ];
+            if (!courses.length) courses = [
+                { _id: '1', name: 'CS101', credits: 3 },
+                { _id: '2', name: 'MATH201', credits: 3 }
+            ];
+            localStorage.setItem('faculty', JSON.stringify(faculty));
+            localStorage.setItem('courses', JSON.stringify(courses));
+            updateCalendar('dashboard');
+            updateCrudLists();
+            populateAddModal();
+            updateWorkload();
+            renderChart();
+        }
+
+        // Sidebar Navigation
+        document.querySelectorAll('#nav a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = link.dataset.section;
+                document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+                document.getElementById(section).classList.remove('hidden');
+                document.getElementById('sectionTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1);
+                document.querySelectorAll('#nav a').forEach(a => a.classList.remove('active'));
+                link.classList.add('active');
+                if (section === 'dashboard' || section === 'availability') updateCalendar(section);
+                if (section === 'workload') updateWorkload();
+                if (section === 'dashboard') renderChart();
+            });
+        });
+
+        // Sidebar Toggle
+        document.getElementById('toggleSidebar').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        });
+
+        // Theme Toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        });
+        if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
+
+        // Search Functionality
+        document.getElementById('searchBar').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            updateCrudLists(query);
+        });
+
+        // Auto Assign Courses
+        document.getElementById('assignCourses').addEventListener('click', () => {
+            assignments = [];
+            courses.forEach(course => {
+                let scheduled = false;
+                for (const day of days) {
+                    for (const time of times) {
+                        const availableFaculty = faculty.find(f => !assignments.some(a => a.facultyId === f._id && a.day === day && a.time === time));
+                        if (availableFaculty) {
+                            assignments.push({ _id: Date.now().toString() + course._id, day, time, courseId: course._id, facultyId: availableFaculty._id });
+                            scheduled = true;
+                            break;
+                        }
+                    }
+                    if (scheduled) break;
+                }
+            });
+            localStorage.setItem('assignments', JSON.stringify(assignments));
+            updateCalendar('dashboard');
+            addNotification('Courses assigned successfully');
+        });
+
+        // Drag-and-Drop
+        function makeDraggable(card, assignment) {
+            card.draggable = true;
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text', JSON.stringify(assignment));
+            });
+        }
+
+        document.addEventListener('dragover', (e) => e.preventDefault());
+        document.addEventListener('drop', (e) => {
+            if (!e.target.classList.contains('drop-zone')) return;
+            e.preventDefault();
+            const assignment = JSON.parse(e.dataTransfer.getData('text'));
+            const [day, time] = e.target.id.split('-');
+            if (checkConflict(day, time, assignment)) {
+                addConflict(`Conflict at ${day} ${time}`);
+                return;
+            }
+            assignments = assignments.map(a => a._id === assignment._id ? { ...a, day, time } : a);
+            localStorage.setItem('assignments', JSON.stringify(assignments));
+            updateCalendar('availability');
+            addNotification(`Moved ${getCourseName(assignment.courseId)} to ${day} ${time}`);
+        });
+
+        // Calendar View
+        function updateCalendar(section) {
+            const grid = document.getElementById(section === 'dashboard' ? 'calendar' : 'availabilityGrid');
+            grid.innerHTML = `
+                <div class="text-center font-semibold text-gray-600 dark:text-gray-300">Time</div>
+                ${days.map(day => `<div class="text-center font-semibold text-gray-600 dark:text-gray-300">${day.slice(0, 3)}</div>`).join('')}
+            `;
+            times.forEach(time => {
+                grid.innerHTML += `<div class="drop-zone bg-gray-50 dark:bg-gray-700 p-2 rounded-md">${time}</div>`;
+                days.forEach(day => {
+                    const assignment = assignments.find(a => a.day === day && a.time === time);
+                    const html = assignment ? `
+                        <div class="faculty-card bg-teal-100 dark:bg-teal-900 p-2 rounded-md text-sm">
+                            <div class="font-semibold text-teal-700 dark:text-teal-300">${getCourseName(assignment.courseId)}</div>
+                            <div class="text-gray-600 dark:text-gray-300">${getFacultyName(assignment.facultyId)}</div>
+                        </div>
+                    ` : '';
+                    grid.innerHTML += `<div id="${day}-${time}" class="drop-zone bg-white dark:bg-gray-800 p-2 rounded-md">${html}</div>`;
+                });
+            });
+            if (currentUser.role === 'admin') {
+                document.querySelectorAll('.faculty-card').forEach(card => {
+                    const assignment = assignments.find(a => a.day === card.parentElement.id.split('-')[0] && a.time === card.parentElement.id.split('-')[1]);
+                    makeDraggable(card, assignment);
+                });
+            }
+        }
+
+        // Conflict Detection
+        function checkConflict(day, time, assignment) {
+            const conflicts = assignments.filter(a => 
+                a.day === day && a.time === time && a._id !== assignment._id &&
+                (a.facultyId === assignment.facultyId || a.courseId === assignment.courseId)
+            );
+            if (conflicts.length > 0) {
+                addSuggestion(`Move ${getCourseName(assignment.courseId)} to avoid conflict with ${getCourseName(conflicts[0].courseId)}`);
+                return true;
+            }
+            return false;
+        }
+
+        // Assign Course
+        document.getElementById('openAddModal').addEventListener('click', () => {
+            document.getElementById('addModal').classList.add('active');
+        });
+
+        function populateAddModal() {
+            document.getElementById('faculty').innerHTML = faculty.map(f => `<option value="${f._id}">${f.name}</option>`).join('');
+            document.getElementById('course').innerHTML = courses.map(c => `<option value="${c._id}">${c.name}</option>`).join('');
+        }
+
+        function assignCourse() {
+            const assignment = {
+                _id: Date.now().toString(),
+                facultyId: document.getElementById('faculty').value,
+                courseId: document.getElementById('course').value,
+                day: document.getElementById('day').value,
+                time: document.getElementById('time').value,
+            };
+            if (checkConflict(assignment.day, assignment.time, assignment)) {
+                addConflict(`Conflict at ${assignment.day} ${assignment.time}`);
+                return;
+            }
+            assignments.push(assignment);
+            localStorage.setItem('assignments', JSON.stringify(assignments));
+            updateCalendar('dashboard');
+            addNotification(`Assigned ${getCourseName(assignment.courseId)} to ${getFacultyName(assignment.facultyId)}`);
+            closeAddModal();
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('active');
+        }
+
+        // CRUD Operations
+        function openCrudModal(type) {
+            document.getElementById('crudModal').classList.add('active');
+            document.getElementById('crudTitle').textContent = `Add ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+            document.getElementById('crudExtra').classList.toggle('hidden', type !== 'faculty' && type !== 'course');
+            document.getElementById('crudExtra').placeholder = type === 'faculty' ? 'Expertise' : 'Credits';
+            document.getElementById('crudExtra').id = `${type}Extra`;
+        }
+
+        function saveCrud() {
+            const type = document.getElementById('crudTitle').textContent.split(' ')[1].toLowerCase();
+            const data = { _id: Date.now().toString(), name: document.getElementById('crudName').value };
+            if (type === 'faculty') data.expertise = document.getElementById('facultyExtra').value;
+            if (type === 'course') data.credits = parseInt(document.getElementById('courseExtra').value);
+            if (type === 'faculty') faculty.push({ ...data, bio: 'New Faculty' });
+            else if (type === 'course') courses.push(data);
+            localStorage.setItem(`${type}`, JSON.stringify(eval(type)));
+            updateCrudLists();
+            populateAddModal();
+            closeCrudModal();
+        }
+
+        function closeCrudModal() {
+            document.getElementById('crudModal').classList.remove('active');
+            document.getElementById('crudName').value = '';
+            document.getElementById(`${document.getElementById('crudTitle').textContent.split(' ')[1].toLowerCase()}Extra`).value = '';
+        }
+
+        function updateCrudLists(query = '') {
+            const filteredFaculty = faculty.filter(f => f.name.toLowerCase().includes(query));
+            const filteredCourses = courses.filter(c => c.name.toLowerCase().includes(query));
+            document.getElementById('facultyList').innerHTML = filteredFaculty.map(f => `
+                <div class="card bg-white dark:bg-gray-800 p-4 rounded-xl">
+                    <div class="font-semibold text-teal-600 dark:text-teal-400">${f.name}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300">${f.expertise} - ${f.bio}</div>
+                </div>
+            `).join('');
+            document.getElementById('coursesList').innerHTML = filteredCourses.map(c => `
+                <div class="card bg-white dark:bg-gray-800 p-4 rounded-xl">
+                    <div class="font-semibold text-indigo-600 dark:text-indigo-400">${c.name}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-300">${c.credits} credits</div>
+                </div>
+            `).join('');
+        }
+
+        // Workload Management
+        function updateWorkload() {
+            const workload = faculty.map(f => {
+                const assignedCourses = assignments.filter(a => a.facultyId === f._id);
+                const totalCredits = assignedCourses.reduce((sum, a) => sum + (courses.find(c => c._id === a.courseId)?.credits || 0), 0);
+                return { name: f.name, courses: assignedCourses.length, credits: totalCredits };
+            });
+            document.getElementById('workloadList').innerHTML = workload.map(w => `
+                <div class="card bg-white dark:bg-gray-800 p-4 rounded-xl">
+                    <div class="font-semibold text-teal-600 dark:text-teal-400">${w.name}</div>
+                    <div class="text-sm">Courses: ${w.courses}</div>
+                    <div class="text-sm">Credits: ${w.credits}</div>
+                    <div class="progress-bar bg-gray-200 dark:bg-gray-700 mt-2">
+                        <div class="bg-teal-600 h-full rounded-md" style="width: ${Math.min(w.credits * 10, 100)}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Chart Rendering
+        function renderChart() {
+            const workload = faculty.map(f => {
+                const assignedCourses = assignments.filter(a => a.facultyId === f._id);
+                return assignedCourses.reduce((sum, a) => sum + (courses.find(c => c._id === a.courseId)?.credits || 0), 0);
+            });
+            const ctx = document.getElementById('workloadChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: faculty.map(f => f.name),
+                    datasets: [{
+                        label: 'Credits',
+                        data: workload,
+                        backgroundColor: '#2dd4bf',
+                        borderColor: '#14b8a6',
+                        borderWidth: 1
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        // Notifications & Suggestions
+        function addNotification(message) {
+            const time = new Date().toLocaleTimeString();
+            document.getElementById('notifications').innerHTML += `
+                <li class="notification flex justify-between items-center p-2 bg-teal-100 dark:bg-teal-900 rounded-md">
+                    ${message} <span class="text-xs text-gray-500">${time}</span>
+                    <button onclick="this.parentElement.remove()" class="text-red-500 ml-2"><i class="fas fa-times"></i></button>
+                </li>`;
+        }
+
+        function addSuggestion(message) {
+            document.getElementById('suggestions').innerHTML += `<li class="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-md">${message}</li>`;
+        }
+
+        function addConflict(message) {
+            document.getElementById('conflicts').innerHTML += `<li class="p-2 bg-coral-100 dark:bg-coral-900 rounded-md">${message}</li>`;
+        }
+
+        // Chatbot
+        function toggleChatbot() {
+            document.getElementById('chatbot').classList.toggle('hidden');
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const message = input.value;
+            document.getElementById('chatMessages').innerHTML += `
+                <p class="text-teal-600 font-semibold">You: ${message}</p>
+                <p class="text-indigo-600">${getChatResponse(message)}</p>
+            `;
+            input.value = '';
+        }
+
+        function getChatResponse(message) {
+            if (message.toLowerCase().includes('faculty')) {
+                return assignments.map(a => `${a.day} ${a.time}: ${getFacultyName(a.facultyId)} - ${getCourseName(a.courseId)}`).join('<br>');
+            }
+            return 'Ask me about faculty schedules or workload!';
+        }
+
+        // PDF Export
+        document.getElementById('exportPDF').addEventListener('click', () => {
+            const doc = new jsPDF();
+            doc.setFontSize(16);
+            doc.text('Faculty Schedule', 10, 10);
+            let y = 20;
+            assignments.forEach(a => {
+                doc.text(`${a.day} ${a.time}: ${getFacultyName(a.facultyId)} - ${getCourseName(a.courseId)}`, 10, y);
+                y += 10;
+            });
+            doc.save('faculty_schedule.pdf');
+        });
+
+        // Helpers
+        function getFacultyName(id) { return faculty.find(f => f._id === id)?.name || 'Unknown'; }
+        function getCourseName(id) { return courses.find(c => c._id === id)?.name || 'Unknown'; }
+
+        // Role-based UI
+        function updateUIForRole() {
+            document.getElementById('assignCourses').classList.toggle('hidden', currentUser.role !== 'admin');
+            document.getElementById('openAddModal').classList.toggle('hidden', currentUser.role !== 'admin');
+            updateCalendar('dashboard');
+        }
+
+        // Initial Setup
+        fetchData();
+    </script>
+</body>
+</html>
